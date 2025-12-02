@@ -2,54 +2,8 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Precipitador Electrostático - VERSIÓN DEFINITIVA</title>
-<style>
-  body {margin:0; height:100vh; background:#000; overflow:hidden; font-family:Arial; color:#fff;}
-  #world {width:400vw; height:100vh; display:flex; position:relative;
-    transition: transform 2s cubic-bezier(0.3,0,0.1,1);}
-  .stage {width:100vw; height:100vh; position:relative;}
-  .chamber {
-    position:absolute; top:100px; left:100px; right:100px; bottom:100px;
-    border:20px solid #ff0;
-    border-image:repeating-linear-gradient(45deg,#000 0px,#000 15px,#ff0 15px,#ff0 30px) 20;
-    box-shadow:0 0 60px #ff0;
-  }
-  .particle {
-    position:absolute; width:12px; height:12px; border-radius:50%;
-    pointer-events:none;
-  }
-  .dirty {background:#fff; box-shadow:0 0 12px #fff;}
-  .charged {background:#00f; box-shadow:0 0 30px #0ff; transform:scale(1.4);}
-  .clean {background:#0f0; box-shadow:0 0 25px #0f0; animation:float 6s infinite ease-in-out;}
-
-  @keyframes float {
-    0%,100% {transform:translateY(0)   rotate(0deg);}
-    50%     {transform:translateY(-40px) rotate(5deg);}
-  }
-
-  .plate {
-    position:absolute; top:0; width:40px; height:100%;
-    background:repeating-linear-gradient(90deg,#f00,#f00 25px,#900 25px,#900 50px);
-    opacity:0;
-  }
-  .plate.active {opacity:0.8; animation:flash 1.2s infinite;}
-  @keyframes flash{0%,100%{opacity:0.8}50%{opacity:0.4}}
-
-  #controls {
-    position:fixed; bottom:40px; left:50%; transform:translateX(-50%);
-    z-index:999; display:flex; gap:40px;
-  }
-  button {
-    padding:20px 45px; font-size:26px; font-weight:bold;
-    border:none; border-radius:15px; cursor:pointer; color:white;
-  }
-  #before{background:#c00;} #reset{background:#555;} #next{background:#0b0; box-shadow:0 0 30px #0f0;}
-
-  h2 {
-    position:absolute; top:30px; left:50%; transform:translateX(-50%);
-    font-size:36px; color:#ff0; text-shadow:0 0 20px #ff0; z-index:10;
-  }
-</style>
+<title>Precipitador Electrostático - Versión Final</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -74,89 +28,6 @@
   <button id="next">NEXT</button>
 </div>
 
-<script>
-const world = document.getElementById('world');
-let phase = 0;
-let particles = [];
-
-function crearParticulas() {
-  particles = [];
-  for(let i = 0; i < 40; i++) {
-    const p = document.createElement('div');
-    p.className = 'particle dirty';
-    p.style.left = '150px';
-    p.style.top = (120 + Math.random()*460) + 'px';
-    world.appendChild(p);
-    particles.push({el: p, charged: false});
-  }
-}
-crearParticulas();
-
-function irAFase(n) {
-  if (n < 0 || n > 3) return;
-  phase = n;
-  world.style.transform = `translateX(-${n * 100}vw)`;
-  const offset = n * window.innerWidth;
-
-  // ETAPA 2 (ionización)
-  if (n === 1) {
-    particles.forEach((p, i) => {
-      setTimeout(() => {
-        p.el.style.transition = 'all 3s ease-out';
-        p.el.style.left = (offset + 300 + Math.random()*300) + 'px';
-        p.el.style.top = (120 + Math.random()*460) + 'px';
-      }, i*60);
-    });
-    setTimeout(() => {
-      particles.forEach(p => {
-        if (Math.random() < 0.7) {
-          p.charged = true;
-          p.el.classList.replace('dirty', 'charged');
-        }
-      });
-    }, 3200);
-  }
-
-  // ETAPA 3 (placas)
-  if (n === 2) {
-    particles.forEach(p => {
-      if (p.charged) {
-        const placas = [15, 35, 65, 85];
-        const destX = placas[Math.floor(Math.random()*4)];
-        p.el.style.transition = 'all 2.8s ease-in-out';
-        p.el.style.left = (offset + destX/100 * window.innerWidth) + 'px';
-        p.el.style.top = (120 + Math.random()*460) + 'px';
-      } else {
-        p.el.style.transition = 'all 4s linear';
-        p.el.style.left = (offset + window.innerWidth + 300) + 'px';
-      }
-    });
-  }
-
-  // ETAPA 4 (aire limpio → verdes y flotando)
-  if (n === 3) {
-    particles.forEach(p => {
-      if (!p.charged) {
-        p.el.classList.replace('dirty', 'clean');
-        p.el.style.transition = 'all 1.5s ease-out';
-        // Las mantenemos dentro del cuadrado de la etapa 4
-        const baseX = offset + 150;
-        const baseY = 120;
-        p.el.style.left = (baseX + Math.random()*500) + 'px';
-        p.el.style.top  = (baseY + Math.random()*460) + 'px';
-      }
-    });
-
-    setTimeout(() => {
-      alert("¡Aire 100% limpio y purificado!\nLas partículas verdes flotan felices");
-    }, 2000);
-  }
-}
-
-// Botones
-document.getElementById('next').onclick    = () => irAFase(phase + 1);
-document.getElementById('before').onclick = () => irAFase(phase - 1);
-document.getElementById('reset').onclick  = () => location.reload();
-</script>
+<script src="script.js"></script>
 </body>
 </html>
