@@ -1,151 +1,162 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Simulador Precipitador Electrostático - Aire Limpio</title>
-  <style>
-    html,body{height:100%;margin:0;background:#0a101c;color:#dbeafe;font-family:Inter,Arial,sans-serif;overflow:hidden;transition:background 2s ease}
-    .ui{position:fixed;right:15px;top:15px;background:#0e172a;padding:10px 14px;border-radius:10px;box-shadow:0 0 10px #0006;max-width:260px;cursor:move;user-select:none}
-    label{font-size:13px;margin-top:5px;display:block;color:#bae6fd}
-    input[type=range]{width:100%}
-    button{margin-top:8px;width:100%;padding:6px;border:none;border-radius:6px;background:#1e3a8a;color:#fff;cursor:pointer}
-    button:hover{background:#2563eb}
-    #stats{font-size:12px;color:#9ca3af;margin-top:6px}
-    canvas{display:block;width:100%;height:100%}
-  </style>
+<meta charset="UTF-8">
+<title>Precipitador Electrostático - VERSIÓN DEFINITIVA</title>
+<style>
+  body {margin:0; height:100vh; background:#000; overflow:hidden; font-family:Arial; color:#fff;}
+  #world {width:400vw; height:100vh; display:flex; position:relative;
+    transition: transform 2s cubic-bezier(0.3,0,0.1,1);}
+  .stage {width:100vw; height:100vh; position:relative;}
+  .chamber {
+    position:absolute; top:100px; left:100px; right:100px; bottom:100px;
+    border:20px solid #ff0;
+    border-image:repeating-linear-gradient(45deg,#000 0px,#000 15px,#ff0 15px,#ff0 30px) 20;
+    box-shadow:0 0 60px #ff0;
+  }
+  .particle {
+    position:absolute; width:12px; height:12px; border-radius:50%;
+    pointer-events:none;
+  }
+  .dirty {background:#fff; box-shadow:0 0 12px #fff;}
+  .charged {background:#00f; box-shadow:0 0 30px #0ff; transform:scale(1.4);}
+  .clean {background:#0f0; box-shadow:0 0 25px #0f0; animation:float 6s infinite ease-in-out;}
+
+  @keyframes float {
+    0%,100% {transform:translateY(0)   rotate(0deg);}
+    50%     {transform:translateY(-40px) rotate(5deg);}
+  }
+
+  .plate {
+    position:absolute; top:0; width:40px; height:100%;
+    background:repeating-linear-gradient(90deg,#f00,#f00 25px,#900 25px,#900 50px);
+    opacity:0;
+  }
+  .plate.active {opacity:0.8; animation:flash 1.2s infinite;}
+  @keyframes flash{0%,100%{opacity:0.8}50%{opacity:0.4}}
+
+  #controls {
+    position:fixed; bottom:40px; left:50%; transform:translateX(-50%);
+    z-index:999; display:flex; gap:40px;
+  }
+  button {
+    padding:20px 45px; font-size:26px; font-weight:bold;
+    border:none; border-radius:15px; cursor:pointer; color:white;
+  }
+  #before{background:#c00;} #reset{background:#555;} #next{background:#0b0; box-shadow:0 0 30px #0f0;}
+
+  h2 {
+    position:absolute; top:30px; left:50%; transform:translateX(-50%);
+    font-size:36px; color:#ff0; text-shadow:0 0 20px #ff0; z-index:10;
+  }
+</style>
 </head>
 <body>
-  <canvas id="sim"></canvas>
-  <div class="ui" id="panel">
-    <label>Voltaje de placas (kV): <span id="voltText"></span></label>
-    <input type="range" id="voltage" min="1" max="50" step="1" value="25">
 
-    <label>Velocidad del aire (m/s): <span id="flowText"></span></label>
-    <input type="range" id="flow" min="0.5" max="5" step="0.1" value="2">
-
-    <label>Nivel de contaminación: <span id="contText"></span></label>
-    <input type="range" id="cont" min="1" max="100" step="1" value="40">
-
-    <button id="startBtn">Iniciar</button>
-    <button id="pauseBtn">Pausar</button>
-    <button id="resetBtn">Reiniciar</button>
-
-    <div id="stats"></div>
+<div id="world">
+  <div class="stage"><h2>1. Entrada de aire sucio</h2><div class="chamber"></div></div>
+  <div class="stage"><h2>2. Ionización</h2><div class="chamber"></div></div>
+  <div class="stage">
+    <h2>3. Atracción a placas</h2>
+    <div class="chamber">
+      <div class="plate active" style="left:15%;"></div>
+      <div class="plate active" style="left:35%;"></div>
+      <div class="plate active" style="right:35%;"></div>
+      <div class="plate active" style="right:15%;"></div>
+    </div>
   </div>
+  <div class="stage"><h2>4. ¡Aire limpio y purificado!</h2><div class="chamber"></div></div>
+</div>
 
-  <script>
-    const canvas=document.getElementById('sim');
-    const ctx=canvas.getContext('2d');
-    canvas.width=window.innerWidth;
-    canvas.height=window.innerHeight;
-    let W=canvas.width,H=canvas.height;
+<div id="controls">
+  <button id="before">BEFORE</button>
+  <button id="reset">RESET</button>
+  <button id="next">NEXT</button>
+</div>
 
-    let particles=[], collected=[], cleanAir=[], smoke=[];
-    let running=false;
+<script>
+const world = document.getElementById('world');
+let phase = 0;
+let particles = [];
 
-    const controls={ voltage:document.getElementById('voltage'), flow:document.getElementById('flow'), cont:document.getElementById('cont') };
-    const labels={ voltText:document.getElementById('voltText'), flowText:document.getElementById('flowText'), contText:document.getElementById('contText') };
-    const stats=document.getElementById('stats');
+function crearParticulas() {
+  particles = [];
+  for(let i = 0; i < 40; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle dirty';
+    p.style.left = '150px';
+    p.style.top = (120 + Math.random()*460) + 'px';
+    world.appendChild(p);
+    particles.push({el: p, charged: false});
+  }
+}
+crearParticulas();
 
-    function updateLabels(){
-      labels.voltText.textContent=controls.voltage.value;
-      labels.flowText.textContent=controls.flow.value;
-      labels.contText.textContent=controls.cont.value+'%';
-    }
-    updateLabels();
-    Object.values(controls).forEach(el=>el.addEventListener('input',updateLabels));
+function irAFase(n) {
+  if (n < 0 || n > 3) return;
+  phase = n;
+  world.style.transform = `translateX(-${n * 100}vw)`;
+  const offset = n * window.innerWidth;
 
-    class Particle{
-      constructor(x,y){this.x=x;this.y=y;this.vx=Math.random()*2+1;this.vy=(Math.random()-0.5)*1;this.size=Math.random()*2+2;this.charged=false;this.stuck=false;this.alpha=1;}
-      update(dt){
-        if(this.stuck){this.alpha-=dt*0.05;if(this.alpha<=0)this.alpha=0;return;}
-        this.x+=this.vx*parseFloat(controls.flow.value)*dt*60;this.y+=this.vy;
-        if(this.x>W*0.35&&!this.charged){this.charged=true;}
-        if(this.charged&&this.x>W*0.5&&this.x<W*0.85){let voltage=parseFloat(controls.voltage.value);let direction=(this.y<H/2)?-1:1;this.vy+=direction*voltage*0.0002;}
-        if(this.x>W*0.5&&this.x<W*0.85){if(this.y<100||this.y>H-100){this.stuck=true;if(Math.random()<0.5)collected.push(this);else cleanAir.push(new CleanParticle(W*0.85,this.y));}}
-        if(this.x>W*0.85){cleanAir.push(new CleanParticle(this.x,this.y));this.alpha=0;}
+  // ETAPA 2 (ionización)
+  if (n === 1) {
+    particles.forEach((p, i) => {
+      setTimeout(() => {
+        p.el.style.transition = 'all 3s ease-out';
+        p.el.style.left = (offset + 300 + Math.random()*300) + 'px';
+        p.el.style.top = (120 + Math.random()*460) + 'px';
+      }, i*60);
+    });
+    setTimeout(() => {
+      particles.forEach(p => {
+        if (Math.random() < 0.7) {
+          p.charged = true;
+          p.el.classList.replace('dirty', 'charged');
+        }
+      });
+    }, 3200);
+  }
+
+  // ETAPA 3 (placas)
+  if (n === 2) {
+    particles.forEach(p => {
+      if (p.charged) {
+        const placas = [15, 35, 65, 85];
+        const destX = placas[Math.floor(Math.random()*4)];
+        p.el.style.transition = 'all 2.8s ease-in-out';
+        p.el.style.left = (offset + destX/100 * window.innerWidth) + 'px';
+        p.el.style.top = (120 + Math.random()*460) + 'px';
+      } else {
+        p.el.style.transition = 'all 4s linear';
+        p.el.style.left = (offset + window.innerWidth + 300) + 'px';
       }
-      draw(ctx){ctx.beginPath();ctx.fillStyle=`rgba(230,230,230,${this.alpha})`;ctx.arc(this.x,this.y,this.size,0,Math.PI*2);ctx.fill();}
-    }
+    });
+  }
 
-    class CleanParticle{
-      constructor(x,y){this.x=x;this.y=y;this.vx=Math.random()*2+1;this.vy=(Math.random()-0.5)*0.5;this.size=Math.random()*3+2;this.alpha=1;}
-      update(dt){this.x+=this.vx*dt*60;this.alpha-=dt*0.05;if(this.alpha<0)this.alpha=0;}
-      draw(ctx){ctx.beginPath();ctx.fillStyle=`rgba(80,255,120,${this.alpha})`;ctx.arc(this.x,this.y,this.size,0,Math.PI*2);ctx.fill();}
-    }
+  // ETAPA 4 (aire limpio → verdes y flotando)
+  if (n === 3) {
+    particles.forEach(p => {
+      if (!p.charged) {
+        p.el.classList.replace('dirty', 'clean');
+        p.el.style.transition = 'all 1.5s ease-out';
+        // Las mantenemos dentro del cuadrado de la etapa 4
+        const baseX = offset + 150;
+        const baseY = 120;
+        p.el.style.left = (baseX + Math.random()*500) + 'px';
+        p.el.style.top  = (baseY + Math.random()*460) + 'px';
+      }
+    });
 
-    class SmokeParticle{
-      constructor(x,y){this.x=x;this.y=y;this.vx=Math.random()*1+0.5;this.vy=(Math.random()-0.5)*1.5;this.size=Math.random()*20+20;this.alpha=0.3+Math.random()*0.2;}
-      update(dt,eff){this.x+=this.vx*dt*30;this.alpha-=dt*(0.01+eff*0.01);}
-      draw(ctx){ctx.beginPath();ctx.fillStyle=`rgba(100,100,100,${this.alpha})`;ctx.arc(this.x,this.y,this.size,0,Math.PI*2);ctx.fill();}
-    }
+    setTimeout(() => {
+      alert("¡Aire 100% limpio y purificado!\nLas partículas verdes flotan felices");
+    }, 2000);
+  }
+}
 
-    function generateParticles(){
-      let density=parseInt(controls.cont.value);
-      for(let i=0;i<density/10;i++)particles.push(new Particle(W*0.05+Math.random()*20,100+Math.random()*(H-200)));
-      for(let i=0;i<density/15;i++)smoke.push(new SmokeParticle(W*0.05,100+Math.random()*(H-200)));
-    }
-
-    function drawAirflow(eff){
-      let tone=20+eff*0.5;
-      document.body.style.background=`rgb(${tone},${tone+20},${tone+60})`;
-      const grad=ctx.createLinearGradient(0,0,W,0);
-      grad.addColorStop(0,'rgba(80,120,200,0.05)');
-      grad.addColorStop(1,'rgba(50,200,150,0.05)');
-      ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
-      ctx.strokeStyle='rgba(120,220,255,0.2)';
-      for(let i=0;i<5;i++){ctx.beginPath();let y=150+i*120+(Math.sin(Date.now()/500+i)*5);ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-    }
-
-    function draw(eff){
-      ctx.clearRect(0,0,W,H);
-      drawAirflow(eff);
-      for(let s of smoke)s.draw(ctx);
-      ctx.fillStyle='rgba(100,150,255,0.15)';ctx.fillRect(0,50,W*0.2,H-100);ctx.fillStyle='#a5f3fc';ctx.fillText('Entrada de aire contaminado',W*0.05,40);
-      ctx.fillStyle='rgba(255,200,80,0.1)';ctx.fillRect(W*0.35,50,W*0.15,H-100);ctx.fillText('Zona de ionización (corona)',W*0.38,40);
-      ctx.fillStyle='rgba(255,80,80,0.35)';ctx.fillRect(W*0.5,100,W*0.35,10);
-      ctx.fillStyle='rgba(80,160,255,0.35)';ctx.fillRect(W*0.5,H-110,W*0.35,10);
-      ctx.fillStyle='#dbeafe';ctx.fillText('Cámara colectora',W*0.6,40);
-      ctx.fillStyle='rgba(100,255,150,0.15)';ctx.fillRect(W*0.85,50,W*0.1,H-100);
-      ctx.fillStyle='#a7f3d0';ctx.fillText('Salida de aire limpio',W*0.87,40);
-      for(let p of particles)p.draw(ctx);
-      for(let p of collected){if(p.alpha>0)p.draw(ctx);}
-      for(let c of cleanAir)c.draw(ctx);
-    }
-
-    function update(dt,eff){
-      if(Math.random()<0.3)generateParticles();
-      for(let p of particles)p.update(dt);
-      particles=particles.filter(p=>p.x<W&&!p.stuck);
-      collected=collected.filter(p=>p.alpha>0);
-      for(let c of cleanAir)c.update(dt);
-      cleanAir=cleanAir.filter(c=>c.alpha>0);
-      for(let s of smoke)s.update(dt,eff);
-      smoke=smoke.filter(s=>s.alpha>0);
-    }
-
-    let lastT=performance.now();
-    function loop(t){
-      let dt=(t-lastT)/1000;lastT=t;
-      let eff=(collected.length/(particles.length+collected.length+1))*100;
-      if(running)update(dt,eff/100);
-      draw(eff);
-      stats.innerHTML=`Partículas totales: ${particles.length+collected.length}<br>Recolectadas: ${collected.length}<br>Aire limpio emitido: ${cleanAir.length}<br><b>Índice de pureza del aire:</b> ${eff.toFixed(1)}%`;
-      requestAnimationFrame(loop);
-    }
-
-    loop(performance.now());
-
-    document.getElementById('startBtn').onclick=()=>running=true;
-    document.getElementById('pauseBtn').onclick=()=>running=false;
-    document.getElementById('resetBtn').onclick=()=>{particles=[];collected=[];cleanAir=[];smoke=[];running=false;document.body.style.background='#0a101c';};
-
-    const panel=document.getElementById('panel');
-    let offsetX,offsetY,isDown=false;
-    panel.addEventListener('mousedown',e=>{isDown=true;offsetX=e.clientX-panel.offsetLeft;offsetY=e.clientY-panel.offsetTop;});
-    window.addEventListener('mouseup',()=>isDown=false);
-    window.addEventListener('mousemove',e=>{if(!isDown)return;panel.style.left=e.clientX-offsetX+'px';panel.style.top=e.clientY-offsetY+'px';});
-  </script>
+// Botones
+document.getElementById('next').onclick    = () => irAFase(phase + 1);
+document.getElementById('before').onclick = () => irAFase(phase - 1);
+document.getElementById('reset').onclick  = () => location.reload();
+</script>
 </body>
 </html>
